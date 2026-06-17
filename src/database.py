@@ -56,7 +56,7 @@ def inicializar_base_de_datos():
     # Guardamos los cambios de forma permanente y cerramos la puerta de la conexión
     conn.commit()
     conn.close()
-    print("✅ Base de datos 'playstore.db' y tablas de control creadas con éxito.")
+    print("Base de datos 'playstore.db' y tablas de control creadas con éxito.")
 
 # Este bloque permite que si ejecutas este archivo suelto, se cree la base de datos de inmediato
 if __name__ == "__main__":
