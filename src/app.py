@@ -131,5 +131,4 @@ def actualizar_grafico_tecnico(tamano_maximo):
 
 # 4. Encendemos el servidor web local
 if __name__ == '__main__':
-    # Correrá en la red interna en el puerto 8050
-    app.run_server(host='0.0.0.0', port=8050, debug=False)
+    app.run(host='0.0.0.0', port=8050, debug=False)
