@@ -35,7 +35,7 @@ class AplicacionEsquema(BaseModel):
 # 3. EL PIPELINE AUTOMÁTICO
 def ejecutar_pipeline_etl():
     logging.info("Iniciando el proceso ETL...")
-    print("🚀 Iniciando la tubería ETL automatizada...")
+    print(" Iniciando la tubería ETL automatizada...")
     
     try:
         # Nos aseguramos de que las tablas de la base de datos existan
@@ -80,7 +80,7 @@ def ejecutar_pipeline_etl():
                 # Si falla, se anota calladamente en el archivo log para no romper el programa
                 logging.warning(f"Fila {index} rechazada: {e}")
         
-        print(f"📋 Validación completada. Filas exitosas: {len(registros_validos)} | Errores detectados: {conteo_errores}")
+        print(f" Validación completada. Filas exitosas: {len(registros_validos)} | Errores detectados: {conteo_errores}")
         
         # --- [ L: CARGAR ] ---
         if len(registros_validos) > 0:
@@ -88,7 +88,7 @@ def ejecutar_pipeline_etl():
             conn = obtener_conexion()
             
             # Guardamos el DataFrame limpio en la tabla 'aplicaciones' de la base de datos SQL
-            df_final.to_sql('aplicaciones', conn, if_exists='replace', index=False)
+            df_final.to_sql('aplicaciones', conn, if_exists='append', index=False)
             
             # Guardamos un registro en la tabla de auditoría para saber que todo salió bien
             cursor = conn.cursor()
@@ -105,7 +105,7 @@ def ejecutar_pipeline_etl():
     except Exception as e:
         error_msg = f"Error crítico en el pipeline: {str(e)}"
         logging.error(error_msg)
-        print(f" {error_msg}")
+        print(f"{error_msg}")
 
 if __name__ == "__main__":
     ejecutar_pipeline_etl()
