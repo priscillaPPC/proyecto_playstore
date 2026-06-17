@@ -23,10 +23,9 @@ def inicializar_base_de_datos():
     
     # Abrimos la conexión
     conn = obtener_conexion()
-    cursor = conn.cursor() # El cursor es el "lápiz" con el que escribimos comandos SQL
+    cursor = conn.cursor() 
     
     # TABLA 1: Aquí guardaremos las aplicaciones limpias y procesadas
-    # Cada columna representa una característica que Karla Roco evaluará en la pauta
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS aplicaciones (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
