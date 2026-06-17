@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  dashboard-playstore:
+    build: .
+    container_name: contenedor_playstore_web
+    ports:
+      - "8050:8050"
+    volumes:
+      - ./data:/app/data
+      - ./docs:/app/docs
+    restart: always

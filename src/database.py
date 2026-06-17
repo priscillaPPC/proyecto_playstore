@@ -23,10 +23,9 @@ def inicializar_base_de_datos():
     
     # Abrimos la conexión
     conn = obtener_conexion()
-    cursor = conn.cursor() # El cursor es el "lápiz" con el que escribimos comandos SQL
+    cursor = conn.cursor() 
     
     # TABLA 1: Aquí guardaremos las aplicaciones limpias y procesadas
-    # Cada columna representa una característica que Karla Roco evaluará en la pauta
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS aplicaciones (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +56,7 @@ def inicializar_base_de_datos():
     # Guardamos los cambios de forma permanente y cerramos la puerta de la conexión
     conn.commit()
     conn.close()
-    print("✅ Base de datos 'playstore.db' y tablas de control creadas con éxito.")
+    print("Base de datos 'playstore.db' y tablas de control creadas con éxito.")
 
 # Este bloque permite que si ejecutas este archivo suelto, se cree la base de datos de inmediato
 if __name__ == "__main__":
