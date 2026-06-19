@@ -10,12 +10,27 @@ app = dash.Dash(__name__, title="Play Store Analytics")
 def cargar_datos_desde_sql():
     """Conecta a la base de datos SQL que llenamos con el ETL y extrae los datos."""
     conn = obtener_conexion()
-    df = pd.read_sql_query("SELECT * FROM aplicaciones", conn)
+    # Leemos la tabla. Si hay un error (ej. tabla no existe), devolvemos un DataFrame vacío
+    try:
+        df = pd.read_sql_query("SELECT * FROM aplicaciones", conn)
+    except Exception:
+        df = pd.DataFrame()
     conn.close()
     return df
 
 # Cargamos los datos limpios de la base de datos
 df_apps = cargar_datos_desde_sql()
+
+# --- PROGRAMACIÓN DEFENSIVA ---
+# Si el DataFrame está vacío, asignamos valores por defecto para que la app no colapse
+if df_apps.empty:
+    min_size = 0
+    max_size = 100
+    categorias_disponibles = ['Sin Datos']
+else:
+    min_size = int(df_apps['size'].min())
+    max_size = int(df_apps['size'].max())
+    categorias_disponibles = sorted(df_apps['category'].unique())
 
 # 2. DISEÑO VISUAL DE LA PÁGINA 
 app.layout = html.Div(style={'fontFamily': 'Arial, sans-serif', 'padding': '20px', 'backgroundColor': '#f4f6f9'}, children=[
@@ -27,6 +42,37 @@ app.layout = html.Div(style={'fontFamily': 'Arial, sans-serif', 'padding': '20px
     ]),
     
     html.Br(),
+
+    # =========================================================================
+    # NUEVO: TARJETAS DE KPI (Scorecards)
+    # =========================================================================
+    html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'marginBottom': '20px', 'gap': '15px'}, children=[
+        
+        # Tarjeta 1: Total Apps
+        html.Div(style={'flex': '1', 'backgroundColor': 'white', 'padding': '15px', 'borderRadius': '8px', 'boxShadow': '0px 2px 4px rgba(0,0,0,0.05)', 'textAlign': 'center'}, children=[
+            html.H6("Total Aplicaciones", style={'margin': '0', 'color': '#7f8c8d', 'fontSize': '14px'}),
+            html.H2(id="kpi-total-apps", style={'margin': '5px 0 0 0', 'color': '#2c3e50', 'fontWeight': 'bold'})
+        ]),
+        
+        # Tarjeta 2: Rating Promedio
+        html.Div(style={'flex': '1', 'backgroundColor': 'white', 'padding': '15px', 'borderRadius': '8px', 'boxShadow': '0px 2px 4px rgba(0,0,0,0.05)', 'textAlign': 'center'}, children=[
+            html.H6("Rating Promedio", style={'margin': '0', 'color': '#7f8c8d', 'fontSize': '14px'}),
+            html.H2(id="kpi-avg-rating", style={'margin': '5px 0 0 0', 'color': '#f39c12', 'fontWeight': 'bold'})
+        ]),
+        
+        # Tarjeta 3: Descargas Totales
+        html.Div(style={'flex': '1', 'backgroundColor': 'white', 'padding': '15px', 'borderRadius': '8px', 'boxShadow': '0px 2px 4px rgba(0,0,0,0.05)', 'textAlign': 'center'}, children=[
+            html.H6("Descargas Totales", style={'margin': '0', 'color': '#7f8c8d', 'fontSize': '14px'}),
+            html.H2(id="kpi-total-installs", style={'margin': '5px 0 0 0', 'color': '#27ae60', 'fontWeight': 'bold'})
+        ]),
+
+        # Tarjeta 4: % Apps Populares
+        html.Div(style={'flex': '1', 'backgroundColor': 'white', 'padding': '15px', 'borderRadius': '8px', 'boxShadow': '0px 2px 4px rgba(0,0,0,0.05)', 'textAlign': 'center'}, children=[
+            html.H6("Tasa de Popularidad", style={'margin': '0', 'color': '#7f8c8d', 'fontSize': '14px'}),
+            html.H2(id="kpi-pct-popular", style={'margin': '5px 0 0 0', 'color': '#2980b9', 'fontWeight': 'bold'})
+        ])
+    ]),
+    # =========================================================================
     
     # Sistema de Pestañas
     dcc.Tabs(id="pestanas-audiencia", value='tab-ejecutivo', children=[
@@ -41,8 +87,8 @@ app.layout = html.Div(style={'fontFamily': 'Arial, sans-serif', 'padding': '20px
                 html.Label("Selecciona una Categoría de Apps:", style={'fontWeight': 'bold'}),
                 dcc.Dropdown(
                     id='selector-categoria-ejecutivo',
-                    options=[{'label': cat, 'value': cat} for cat in sorted(df_apps['category'].unique())],
-                    value='GAME', # Valor inicial por defecto
+                    options=[{'label': cat, 'value': cat} for cat in categorias_disponibles],
+                    value=categorias_disponibles[0] if categorias_disponibles else None, 
                     clearable=False
                 ),
                 
@@ -62,10 +108,10 @@ app.layout = html.Div(style={'fontFamily': 'Arial, sans-serif', 'padding': '20px
                 html.Label("Filtrar por Tamaño Máximo Permitido (MB):", style={'fontWeight': 'bold'}),
                 dcc.Slider(
                     id='slider-tamano-tecnico',
-                    min=int(df_apps['size'].min()),
-                    max=int(df_apps['size'].max()),
-                    value=int(df_apps['size'].max()),
-                    marks={i: f'{i}MB' for i in range(0, int(df_apps['size'].max())+1, 20)},
+                    min=min_size,
+                    max=max_size,
+                    value=max_size,
+                    marks={i: f'{i}MB' for i in range(min_size, max_size+1, 20)} if max_size > min_size else {0: '0MB'},
                     step=5
                 ),
                 
@@ -77,32 +123,56 @@ app.layout = html.Div(style={'fontFamily': 'Arial, sans-serif', 'padding': '20px
     ])
 ])
 
-# 3. INTERACTIVIDAD (Callbacks: Conectan los filtros con los gráficos)
+# 3. INTERACTIVIDAD (Callbacks: Conectan los filtros con los gráficos y KPIs)
 
-# Lógica interactiva para la pestaña Ejecutiva
+# Lógica interactiva para la pestaña Ejecutiva (Gráfico + 4 KPIs)
 @app.callback(
-    Output('grafico-dinamico-ejecutivo', 'figure'),
+    [Output('grafico-dinamico-ejecutivo', 'figure'),
+     Output('kpi-total-apps', 'children'),
+     Output('kpi-avg-rating', 'children'),
+     Output('kpi-total-installs', 'children'),
+     Output('kpi-pct-popular', 'children')],
     Input('selector-categoria-ejecutivo', 'value')
 )
-def actualizar_grafico_ejecutivo(categoria_seleccionada):
-    # Filtramos la base de datos por la categoría que el usuario elija en la web
+def actualizar_panel_ejecutivo(categoria_seleccionada):
+    if df_apps.empty or not categoria_seleccionada:
+        return px.bar(title="Sin datos disponibles"), "0", "0 ⭐", "0", "0%"
+
+    # Filtramos la base de datos
     df_filtrado = df_apps[df_apps['category'] == categoria_seleccionada]
     
-    # Tomamos las 10 apps con más opiniones para ver las dominantes
-    top_apps = df_filtrado.sort_values(by="reviews", ascending=False).head(10)
+    # --- CÁLCULO DE KPIs ---
+    total_apps = len(df_filtrado)
+    avg_rating = round(df_filtrado['rating'].mean(), 2) if total_apps > 0 else 0
+    total_installs = df_filtrado['installs'].sum()
     
-    # Creamos un gráfico interactivo de barras con Plotly Express
+    pct_popular = 0
+    if total_apps > 0:
+        pct_popular = round((df_filtrado['is_popular'].sum() / total_apps) * 100, 1)
+    
+    # Formatear números grandes (Descargas)
+    if total_installs >= 1_000_000_000:
+        installs_str = f"{round(total_installs / 1_000_000_000, 1)}B"
+    elif total_installs >= 1_000_000:
+        installs_str = f"{round(total_installs / 1_000_000, 1)}M"
+    else:
+        installs_str = f"{total_installs:,}"
+
+    # --- CREACIÓN DEL GRÁFICO ---
+    top_apps = df_filtrado.sort_values(by="reviews", ascending=False).head(10)
     fig = px.bar(
         top_apps, 
         x="app", 
         y="reviews", 
         color="rating",
-        title=f"Top 10 Aplicaciones Líderes en {categoria_seleccionada} por Reseñas",
+        title=f"Top 10 Apps en {categoria_seleccionada} por Reseñas",
         labels={"app": "Nombre de la App", "reviews": "Número de Reseñas", "rating": "Calificación"},
         color_continuous_scale="Viridis"
     )
-    fig.update_layout(xaxis_tickangle=-45) # Inclinar nombres para que se lean bien
-    return fig
+    fig.update_layout(xaxis_tickangle=-45)
+    
+    # Devolvemos el gráfico y los 4 valores de texto para las tarjetas
+    return fig, f"{total_apps:,}", f"{avg_rating} ⭐", installs_str, f"{pct_popular}%"
 
 # Lógica interactiva para la pestaña Técnica
 @app.callback(
@@ -110,13 +180,13 @@ def actualizar_grafico_ejecutivo(categoria_seleccionada):
     Input('slider-tamano-tecnico', 'value')
 )
 def actualizar_grafico_tecnico(tamano_maximo):
-    # Filtramos las apps que pesen menos o igual que lo que diga la barra deslizante
+    if df_apps.empty:
+        return px.scatter(title="Sin datos disponibles")
+
+    # Filtramos las apps
     df_filtrado = df_apps[df_apps['size'] <= tamano_maximo]
-    
-    # Tomamos una muestra aleatoria de máximo 1000 registros para que el gráfico cargue rápido
     df_muestra = df_filtrado.sample(min(1000, len(df_filtrado)))
     
-    # Creamos un gráfico de dispersión (Scatter Plot) interactivo
     fig = px.scatter(
         df_muestra,
         x="size",
@@ -124,8 +194,8 @@ def actualizar_grafico_tecnico(tamano_maximo):
         color="is_popular",
         hover_name="app",
         title=f"Distribución Operativa de Apps (Filtro: menor a {tamano_maximo} MB)",
-        labels={"size": "Tamaño del Archivo (MB)", "rating": "Calificación (Rating)", "is_popular": "Popularidad (1=Sí)"},
-        color_continuous_scale=["#e74c3c", "#2ecc71"] # Rojo para no populares, Verde para populares
+        labels={"size": "Tamaño (MB)", "rating": "Calificación", "is_popular": "Popularidad (1=Sí)"},
+        color_continuous_scale=["#e74c3c", "#2ecc71"] 
     )
     return fig
 
